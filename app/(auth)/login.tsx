@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router'
 import React, { useState } from 'react'
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
 
 interface LoginProps {
   onLogin?: (username: string, isAdmin: boolean) => void
@@ -10,7 +10,13 @@ const LoginScreen: React.FC<LoginProps> = ({ onLogin }) => {
   const router = useRouter()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [userType, setUserType] = useState<'user' | 'admin'>('user')
   const [error, setError] = useState('')
+
+  // Register form state (visible only for non-admin)
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false)
+  const [registerEmail, setRegisterEmail] = useState('')
+  const [registerPassword, setRegisterPassword] = useState('')
 
   const handleSubmit = () => {
     setError('')
@@ -25,25 +31,21 @@ const LoginScreen: React.FC<LoginProps> = ({ onLogin }) => {
       return
     }
 
-    // Mock authentication - in production this would call an API
-    if (password === 'demo' || password.length >= 4) {
-      const isAdmin = password === 'admin'
-      
-      console.log('Login exitoso:', { username, isAdmin })
-      
-      // Callback si existe
-      if (onLogin) {
-        onLogin(username, isAdmin)
-      }
-      
-      // Navegar según rol
-      if (isAdmin) {
-        router.push('/(admin)')
-      } else {
-        router.push('/(user)')
-      }
+    // Mock authentication: accept any password as long as one is provided
+    const isAdmin = userType === 'admin'
+
+    console.log('Login exitoso:', { username, isAdmin, userType })
+
+    // Callback si existe
+    if (onLogin) {
+      onLogin(username, isAdmin)
+    }
+
+    // Navegar según rol seleccionado
+    if (isAdmin) {
+      router.push('/(admin)')
     } else {
-      setError('Contraseña debe tener al menos 4 caracteres')
+      router.push('/(user)')
     }
   }
 
@@ -61,6 +63,88 @@ const LoginScreen: React.FC<LoginProps> = ({ onLogin }) => {
 
         {/* Form Container */}
         <View className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+          {/* User Type Selector */}
+          <View className="mb-6">
+            <Text className="text-sm font-semibold text-gray-700 mb-2">👥 Tipo de Usuario</Text>
+            <View className="flex-row space-x-4">
+              <TouchableOpacity
+                onPress={() => {
+                  setUserType('user')
+                  // if previously auto-filled admin, clear it when switching back
+                  if (username === 'admin') setUsername('')
+                }}
+                className={`flex-1 py-2 rounded-lg items-center ${userType === 'user' ? 'bg-blue-600' : 'bg-gray-200'}`}
+              >
+                <Text className={`${userType === 'user' ? 'text-white' : 'text-gray-700'}`}>Usuario Normal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setUserType('admin')
+                  // autocomplete username when admin selected
+                  setUsername('admin')
+                  // close register form if open
+                  setIsRegisterOpen(false)
+                }}
+                className={`flex-1 py-2 rounded-lg items-center ${userType === 'admin' ? 'bg-purple-600' : 'bg-gray-200'}`}
+              >
+                <Text className={`${userType === 'admin' ? 'text-white' : 'text-gray-700'}`}>Administrador</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Register toggle - only for non-admin */}
+          {userType === 'user' && (
+            <View className="mb-4">
+              <TouchableOpacity onPress={() => setIsRegisterOpen(prev => !prev)}>
+                <Text className="text-blue-600 font-medium">{isRegisterOpen ? 'Cancelar registro' : '¿No tienes una cuenta? Regístrate'}</Text>
+              </TouchableOpacity>
+
+              {isRegisterOpen && (
+                <View className="mt-4 bg-gray-50 p-4 rounded-lg">
+                  <Text className="text-sm font-semibold text-gray-700 mb-2">Correo</Text>
+                  <TextInput
+                    placeholder="tu@email.com"
+                    value={registerEmail}
+                    onChangeText={setRegisterEmail}
+                    className="border border-gray-300 rounded-lg p-3 mb-3 text-gray-800"
+                    placeholderTextColor="#999"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+
+                  <Text className="text-sm font-semibold text-gray-700 mb-2">Contraseña</Text>
+                  <TextInput
+                    placeholder="Contraseña"
+                    value={registerPassword}
+                    onChangeText={setRegisterPassword}
+                    secureTextEntry
+                    className="border border-gray-300 rounded-lg p-3 mb-3 text-gray-800"
+                    placeholderTextColor="#999"
+                  />
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (!registerEmail.trim() || !registerPassword.trim()) {
+                        Alert.alert('Error', 'Ingresa correo y contraseña para registrarte')
+                        return
+                      }
+                      // Mock register: set username to email (local part) and close
+                      const local = registerEmail.split('@')[0]
+                      setUsername(local)
+                      setIsRegisterOpen(false)
+                      setRegisterEmail('')
+                      setRegisterPassword('')
+                      Alert.alert('Registro', 'Cuenta creada. Ahora puedes iniciar sesión.')
+                    }}
+                    className="bg-green-600 py-3 rounded-lg"
+                  >
+                    <Text className="text-white text-center font-semibold">Crear cuenta</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          )}
+
           {/* Username Field */}
           <View className="mb-6">
             <Text className="text-sm font-semibold text-gray-700 mb-2">👤 Usuario</Text>
@@ -105,19 +189,6 @@ const LoginScreen: React.FC<LoginProps> = ({ onLogin }) => {
           <TouchableOpacity onPress={() => router.back()}>
             <Text className="text-blue-600 text-center font-semibold">Volver</Text>
           </TouchableOpacity>
-        </View>
-
-        {/* Demo Info Section */}
-        <View className="gap-3">
-          <View className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <Text className="text-blue-800 font-semibold text-center mb-1">👤 Usuario Normal</Text>
-            <Text className="text-blue-700 text-center text-xs">Usuario: cualquiera / Contraseña: demo</Text>
-          </View>
-
-          <View className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-            <Text className="text-purple-800 font-semibold text-center mb-1">🛡️ Administrador</Text>
-            <Text className="text-purple-700 text-center text-xs">Usuario: cualquiera / Contraseña: admin</Text>
-          </View>
         </View>
 
         {/* Footer */}

@@ -32,9 +32,9 @@ const TabsLayout = () => {
       <Tabs.Screen
         name="services"
         options={{
-          title: 'Servicios',
-          headerTitle: 'Servicios',
-          tabBarLabel: 'Servicios',
+          title: 'Bitacora',
+          headerTitle: 'Bitacora de Servicios',
+          tabBarLabel: 'Bitacora',
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🔧</Text>,
         }}
       />
