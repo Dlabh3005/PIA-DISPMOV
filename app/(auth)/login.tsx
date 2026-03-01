@@ -1,205 +1,157 @@
-import { useRouter } from 'expo-router'
-import React, { useState } from 'react'
-import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { Alert, Image, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { authService } from "../../src/services/authService";
+// Obtenemos el código desde el archivo .env
+const SECRET_ADMIN_CODE = process.env.EXPO_PUBLIC_ADMIN_CODE || "MASTER123"; 
 
-interface LoginProps {
-  onLogin?: (username: string, isAdmin: boolean) => void
-}
+const LoginScreen = () => {
+  const router = useRouter();
+  const [isAdmin, setIsAdmin] = useState(false);
 
-const LoginScreen: React.FC<LoginProps> = ({ onLogin }) => {
-  const router = useRouter()
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [userType, setUserType] = useState<'user' | 'admin'>('user')
-  const [error, setError] = useState('')
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [adminCode, setAdminCode] = useState("");
 
-  // Register form state (visible only for non-admin)
-  const [isRegisterOpen, setIsRegisterOpen] = useState(false)
-  const [registerEmail, setRegisterEmail] = useState('')
-  const [registerPassword, setRegisterPassword] = useState('')
+  const handleLogin = async () => {
+    try {
+      // 1. Validaciones generales (Email y Pass son obligatorios siempre)
+      if (!email.trim() || !password.trim()) {
+        Alert.alert("Error", "Ingresa correo y contraseña");
+        return;
+      }
 
-  const handleSubmit = () => {
-    setError('')
+      // 2. Validación específica de ADMIN
+      if (isAdmin) {
+        if (!adminCode.trim()) {
+          Alert.alert("Requerido", "El modo Admin requiere el Código de Acceso");
+          return;
+        }
+        
+        if (adminCode !== SECRET_ADMIN_CODE) {
+          Alert.alert("Acceso Denegado", "El código de acceso es incorrecto");
+          return;
+        }
+      }
 
-    if (!username.trim()) {
-      setError('Por favor ingresa un nombre de usuario')
-      return
+      // 3. Si pasamos las validaciones locales, intentamos iniciar sesión en Firebase
+      // Esto verifica que el email y pass sean reales en tu base de datos
+      await authService.login(email, password);
+
+      // 4. Redirección según el rol
+      if (isAdmin) {
+        Alert.alert("Bienvenido Admin", "Acceso concedido al panel.");
+        router.replace('/(admin)');
+      } else {
+        router.replace('/(user)');
+      }
+
+    } catch (error: any) {
+      Alert.alert("Error de Autenticación", error.message);
     }
-
-    if (!password.trim()) {
-      setError('Por favor ingresa una contraseña')
-      return
-    }
-
-    // Mock authentication: accept any password as long as one is provided
-    const isAdmin = userType === 'admin'
-
-    console.log('Login exitoso:', { username, isAdmin, userType })
-
-    // Callback si existe
-    if (onLogin) {
-      onLogin(username, isAdmin)
-    }
-
-    // Navegar según rol seleccionado
-    if (isAdmin) {
-      router.push('/(admin)')
-    } else {
-      router.push('/(user)')
-    }
-  }
+  };
 
   return (
-    <ScrollView className="flex-1 bg-gradient-to-b from-blue-50 to-blue-100">
+    <ScrollView className="flex-1 bg-white">
       <View className="flex-1 justify-center p-6 min-h-screen">
-        {/* Logo Section */}
-        <View className="items-center mb-12">
-          <View className="w-20 h-20 bg-blue-600 rounded-full items-center justify-center mb-4">
-            <Text className="text-5xl">🚗</Text>
-          </View>
+
+        {/* Logo y Título */}
+        <View className="items-center mb-8">
+          <View className="w-20 h-20 rounded-full overflow-hidden mb-4">
+  <Image
+    source={require("../../assets/Imagen2.jpg")} // ruta de tu imagen
+    className="w-20 h-20"
+    resizeMode="cover"
+  />
+</View>
           <Text className="text-4xl font-bold text-gray-900 mb-2">Fix My Car</Text>
-          <Text className="text-gray-600 text-center">Bitácora Inteligente de Mantenimiento</Text>
+          <Text className="text-gray-600">
+            {isAdmin ? "Acceso Administrativo" : "Bitácora Inteligente"}
+          </Text>
         </View>
 
-        {/* Form Container */}
-        <View className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          {/* User Type Selector */}
-          <View className="mb-6">
-            <Text className="text-sm font-semibold text-gray-700 mb-2">👥 Tipo de Usuario</Text>
-            <View className="flex-row space-x-4">
-              <TouchableOpacity
-                onPress={() => {
-                  setUserType('user')
-                  // if previously auto-filled admin, clear it when switching back
-                  if (username === 'admin') setUsername('')
+        {/* Switch Selector */}
+        <View className="flex-row items-center justify-center mb-6 bg-gray-100 p-2 rounded-full self-center">
+            <Text className={`mr-3 font-semibold ${!isAdmin ? 'text-blue-600' : 'text-gray-400'}`}>Usuario</Text>
+            <Switch
+                trackColor={{ false: "#767577", true: "#333" }}
+                thumbColor={"#f4f3f4"}
+                onValueChange={(val) => {
+                    setIsAdmin(val);
+                    setAdminCode(""); // Limpiar código al cambiar
                 }}
-                className={`flex-1 py-2 rounded-lg items-center ${userType === 'user' ? 'bg-blue-600' : 'bg-gray-200'}`}
-              >
-                <Text className={`${userType === 'user' ? 'text-white' : 'text-gray-700'}`}>Usuario Normal</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  setUserType('admin')
-                  // autocomplete username when admin selected
-                  setUsername('admin')
-                  // close register form if open
-                  setIsRegisterOpen(false)
-                }}
-                className={`flex-1 py-2 rounded-lg items-center ${userType === 'admin' ? 'bg-purple-600' : 'bg-gray-200'}`}
-              >
-                <Text className={`${userType === 'admin' ? 'text-white' : 'text-gray-700'}`}>Administrador</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+                value={isAdmin}
+            />
+            <Text className={`ml-3 font-semibold ${isAdmin ? 'text-gray-900' : 'text-gray-400'}`}>Admin</Text>
+        </View>
 
-          {/* Register toggle - only for non-admin */}
-          {userType === 'user' && (
-            <View className="mb-4">
-              <TouchableOpacity onPress={() => setIsRegisterOpen(prev => !prev)}>
-                <Text className="text-blue-600 font-medium">{isRegisterOpen ? 'Cancelar registro' : '¿No tienes una cuenta? Regístrate'}</Text>
-              </TouchableOpacity>
-
-              {isRegisterOpen && (
-                <View className="mt-4 bg-gray-50 p-4 rounded-lg">
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">Correo</Text>
-                  <TextInput
-                    placeholder="tu@email.com"
-                    value={registerEmail}
-                    onChangeText={setRegisterEmail}
-                    className="border border-gray-300 rounded-lg p-3 mb-3 text-gray-800"
-                    placeholderTextColor="#999"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-
-                  <Text className="text-sm font-semibold text-gray-700 mb-2">Contraseña</Text>
-                  <TextInput
-                    placeholder="Contraseña"
-                    value={registerPassword}
-                    onChangeText={setRegisterPassword}
-                    secureTextEntry
-                    className="border border-gray-300 rounded-lg p-3 mb-3 text-gray-800"
-                    placeholderTextColor="#999"
-                  />
-
-                  <TouchableOpacity
-                    onPress={() => {
-                      if (!registerEmail.trim() || !registerPassword.trim()) {
-                        Alert.alert('Error', 'Ingresa correo y contraseña para registrarte')
-                        return
-                      }
-                      // Mock register: set username to email (local part) and close
-                      const local = registerEmail.split('@')[0]
-                      setUsername(local)
-                      setIsRegisterOpen(false)
-                      setRegisterEmail('')
-                      setRegisterPassword('')
-                      Alert.alert('Registro', 'Cuenta creada. Ahora puedes iniciar sesión.')
-                    }}
-                    className="bg-green-600 py-3 rounded-lg"
-                  >
-                    <Text className="text-white text-center font-semibold">Crear cuenta</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+        <View className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+            
+          {/* --- CAMPO EXTRA PARA ADMIN --- */}
+          {isAdmin && (
+            <View className="mb-6 border-b-2 border-gray-200 pb-4">
+                <Text className="text-sm font-bold text-red-600 mb-2">
+                  🛡️ Código de Seguridad
+                </Text>
+                <TextInput
+                  placeholder="Código Maestro"
+                  value={adminCode}
+                  onChangeText={setAdminCode}
+                  secureTextEntry
+                  className="border border-red-200 bg-red-50 rounded-lg p-3 text-gray-800 text-center font-bold"
+                  placeholderTextColor="#999"
+                />
             </View>
           )}
 
-          {/* Username Field */}
-          <View className="mb-6">
-            <Text className="text-sm font-semibold text-gray-700 mb-2">👤 Usuario</Text>
+          {/* Email (Siempre visible) */}
+          <View className="mb-4">
+            <Text className="text-sm font-semibold text-gray-700 mb-2">📧 Correo</Text>
             <TextInput
-              placeholder="Ingresa tu usuario"
-              value={username}
-              onChangeText={setUsername}
+              placeholder="correo"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
               className="border border-gray-300 rounded-lg p-3 text-gray-800"
-              placeholderTextColor="#999"
             />
           </View>
 
-          {/* Password Field */}
+          {/* Password (Siempre visible) */}
           <View className="mb-6">
             <Text className="text-sm font-semibold text-gray-700 mb-2">🔒 Contraseña</Text>
             <TextInput
-              placeholder="Ingresa tu contraseña"
+              placeholder="Contraseña"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
               className="border border-gray-300 rounded-lg p-3 text-gray-800"
-              placeholderTextColor="#999"
             />
           </View>
 
-          {/* Error Message */}
-          {error ? (
-            <View className="bg-red-50 border border-red-200 rounded-lg p-3 mb-6">
-              <Text className="text-red-700 text-sm">{error}</Text>
-            </View>
-          ) : null}
-
-          {/* Submit Button */}
+          {/* Botón Login */}
           <TouchableOpacity
-            onPress={handleSubmit}
-            className="bg-blue-600 py-3 rounded-lg mb-4"
+            onPress={handleLogin}
+            className={`py-3 rounded-lg mb-4 ${isAdmin ? 'bg-gray-900' : 'bg-blue-600'}`}
           >
-            <Text className="text-white text-center font-semibold text-base">Iniciar Sesión</Text>
+            <Text className="text-white text-center font-semibold text-base">
+              {isAdmin ? "Entrar como Admin" : "Iniciar Sesión"}
+            </Text>
           </TouchableOpacity>
 
-          {/* Back Button */}
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text className="text-blue-600 text-center font-semibold">Volver</Text>
-          </TouchableOpacity>
+          {/* Registro (Solo usuarios) */}
+          {!isAdmin && (
+            <TouchableOpacity onPress={() => router.push("/register")}>
+              <Text className="text-blue-600 text-center font-semibold">
+                ¿No tienes cuenta? Regístrate
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* Footer */}
-        <View className="mt-8 pt-6 border-t border-gray-300">
-          <Text className="text-gray-600 text-center text-xs">© 2026 Fix My Car - Bitácora Inteligente</Text>
-        </View>
       </View>
     </ScrollView>
-  )
-}
+  );
+};
 
-export default LoginScreen
-export { LoginScreen }
-
+export default LoginScreen;
