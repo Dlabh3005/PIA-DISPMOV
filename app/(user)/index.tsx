@@ -190,11 +190,13 @@ const UserHomeScreen = () => {
       <View className="mt-2 mb-10">
         <Text className="text-lg font-semibold text-gray-800 mb-4">Opciones rápidas</Text>
         <TouchableOpacity onPress={() => router.push('/(user)/services')} className="bg-gray-100 p-4 rounded-lg mb-3 flex-row justify-between">
+
           <Text className="text-gray-800 font-semibold">🔧 Servicios</Text>
           <Text className="text-gray-400">›</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push('/(user)/expenses')} className="bg-gray-100 p-4 rounded-lg flex-row justify-between">
           <Text className="text-gray-800 font-semibold">💰 Bitacora de Gastos</Text>
+
           <Text className="text-gray-400">›</Text>
         </TouchableOpacity>
       </View>
