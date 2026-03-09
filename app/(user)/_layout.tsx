@@ -32,18 +32,18 @@ const TabsLayout = () => {
       <Tabs.Screen
         name="services"
         options={{
-          title: 'Bitacora',
-          headerTitle: 'Bitacora de Servicios',
-          tabBarLabel: 'Bitacora',
+          title: 'Servicios',
+          headerTitle: 'Servicios',
+          tabBarLabel: 'Servicios',
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🔧</Text>,
         }}
       />
       <Tabs.Screen
         name="expenses"
         options={{
-          title: 'Gastos',
-          headerTitle: 'Mis Gastos',
-          tabBarLabel: 'Gastos',
+          title: 'Bitacora de Gastos',
+          headerTitle: 'Bitacora',
+          tabBarLabel: 'Bitacora',
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>💰</Text>,
         }}
       />

@@ -80,11 +80,15 @@ const ProfileScreen = () => {
       </TouchableOpacity>
 
       <TouchableOpacity
-        onPress={handleLogout}
-        className="bg-red-500 py-3 rounded-lg"
-      >
-        <Text className="text-white text-center font-semibold">Cerrar sesión</Text>
-      </TouchableOpacity>
+  onPress={() => {
+    router.replace('/login');
+  }}
+  className="mt-10 mb-10 bg-red-500 py-4 rounded-lg shadow-sm"
+>
+  <Text className="text-white text-center font-bold">
+    Cerrar Sesión
+  </Text>
+</TouchableOpacity>
     </ScrollView>
   )
 }
