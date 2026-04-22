@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router'
 import React, { useEffect, useState } from 'react'
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { Calendar } from 'react-native-calendars'
 import { Appointment, AppointmentsService } from '../../src/services/AppointmentsService'
 import { VehiclesService } from '../../src/services/VehiclesService'
 
@@ -9,6 +10,8 @@ const AdminScreen = () => {
 
   const [pendingRequests, setPendingRequests] = useState<any[]>([])
   const [pendingAppointments, setPendingAppointments] = useState<Appointment[]>([])
+  const [confirmedAppointments, setConfirmedAppointments] = useState<Appointment[]>([])
+  const [selectedDate, setSelectedDate] = useState<string>('')
 
   useEffect(() => {
     const unsubscribe = VehiclesService.subscribePendingRequests((requests) => {
@@ -22,11 +25,16 @@ const AdminScreen = () => {
     return () => unsubscribe()
   }, [])
 
+  useEffect(() => {
+    const unsubscribe = AppointmentsService.subscribeConfirmedAppointments(setConfirmedAppointments)
+    return () => unsubscribe()
+  }, [])
+
   const handleApprove = async (id: string, model: string) => {
     try {
       await VehiclesService.approveVehicle(id)
       Alert.alert("Éxito", `El vehículo ${model} ha sido aprobado.`)
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "No se pudo aprobar el vehículo.")
     }
   }
@@ -45,6 +53,16 @@ const AdminScreen = () => {
       ]
     )
   }
+
+  const markedDates = confirmedAppointments.reduce((acc, appointment) => {
+    const date = appointment.date
+    if (!acc[date]) {
+      acc[date] = { marked: true, dotColor: 'blue' }
+    }
+    return acc
+  }, {} as any)
+
+  const selectedDayAppointments = confirmedAppointments.filter(app => app.date === selectedDate)
 
   const menuItems = [
     { label: 'Usuarios', icon: '👥' },
@@ -154,6 +172,43 @@ const AdminScreen = () => {
               </View>
             </View>
           ))
+        )}
+      </View>
+
+      {/* --- CALENDARIO DE CITAS --- */}
+      <View className="mb-8">
+        <Text className="text-sm font-bold text-green-600 uppercase tracking-widest mb-4">
+          Calendario de Citas Confirmadas
+        </Text>
+        <Calendar
+          markedDates={{
+            ...markedDates,
+            [selectedDate]: { selected: true, marked: markedDates[selectedDate]?.marked, selectedColor: 'green' }
+          }}
+          onDayPress={(day) => setSelectedDate(day.dateString)}
+          theme={{
+            selectedDayBackgroundColor: 'green',
+            todayTextColor: 'red',
+            arrowColor: 'green',
+          }}
+        />
+        {selectedDate && (
+          <View className="mt-4">
+            <Text className="text-lg font-bold text-gray-800 mb-2">
+              Citas para {selectedDate}:
+            </Text>
+            {selectedDayAppointments.length === 0 ? (
+              <Text className="text-gray-400">No hay citas para este día</Text>
+            ) : (
+              selectedDayAppointments.map((item) => (
+                <View key={item.id} className="bg-green-50 p-3 rounded-lg border border-green-200 mb-2">
+                  <Text className="text-md font-bold text-gray-800">{item.serviceName}</Text>
+                  <Text className="text-gray-600 text-sm">👤 {item.userEmail}</Text>
+                  <Text className="text-gray-600 text-sm">🕐 {item.time}</Text>
+                </View>
+              ))
+            )}
+          </View>
         )}
       </View>
 

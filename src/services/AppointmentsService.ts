@@ -80,8 +80,22 @@ export const AppointmentsService = {
     return await updateDoc(doc(db, COLLECTION, id), { status: "confirmed" });
   },
 
-  // Admin rechaza la cita
-  async rejectAppointment(id: string) {
-    return await updateDoc(doc(db, COLLECTION, id), { status: "rejected" });
+  // Admin: escucha todas las citas confirmadas en tiempo real
+  subscribeConfirmedAppointments(
+    callback: (items: Appointment[]) => void
+  ) {
+    const q = query(
+      collection(db, COLLECTION),
+      where("status", "==", "confirmed")
+    );
+    return onSnapshot(
+      q,
+      (snap) => {
+        callback(
+          snap.docs.map((d) => ({ id: d.id, ...d.data() } as Appointment))
+        );
+      },
+      (error) => console.error("Error citas confirmadas:", error)
+    );
   },
 };

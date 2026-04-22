@@ -33,6 +33,34 @@ interface UpcomingService {
   priority: 'high' | 'medium' | 'low';
 }
 
+// Intervalos de servicio en km
+const SERVICE_INTERVALS = {
+  oilChange: 6000,      // Cambio de aceite: cada 6000 km
+  generalReview: 20000, // Revisión general: cada 20000 km
+  brakeChange: 16000    // Cambio de frenos: cada 16000 km
+};
+
+// Función para calcular los próximos servicios basados en el kilometraje actual
+const calculateUpcomingServices = (currentKm: number): UpcomingService[] => {
+  // Calcular próximo cambio de aceite (cada 6000 km)
+  const nextOilChange = Math.ceil(currentKm / SERVICE_INTERVALS.oilChange) * SERVICE_INTERVALS.oilChange;
+  const daysUntilOil = Math.ceil((nextOilChange - currentKm) / 100); // Aproximación: 100km/día
+  
+  // Calcular próxima revisión general (cada 20000 km)
+  const nextReview = Math.ceil(currentKm / SERVICE_INTERVALS.generalReview) * SERVICE_INTERVALS.generalReview;
+  const daysUntilReview = Math.ceil((nextReview - currentKm) / 100);
+  
+  // Calcular próximo cambio de frenos (cada 16000 km)
+  const nextBrake = Math.ceil(currentKm / SERVICE_INTERVALS.brakeChange) * SERVICE_INTERVALS.brakeChange;
+  const daysUntilBrake = Math.ceil((nextBrake - currentKm) / 100);
+
+  return [
+    { id: '1', service: 'Cambio de aceite', dueKm: nextOilChange, daysUntil: daysUntilOil, priority: 'high' },
+    { id: '2', service: 'Revisión general', dueKm: nextReview, daysUntil: daysUntilReview, priority: 'medium' },
+    { id: '3', service: 'Cambio de frenos', dueKm: nextBrake, daysUntil: daysUntilBrake, priority: 'low' },
+  ];
+};
+
 const defaultUpcomingServices: UpcomingService[] = [
   { id: '1', service: 'Cambio de aceite', dueKm: 50000, daysUntil: 30, priority: 'high' },
   { id: '2', service: 'Revisión general', dueKm: 60000, daysUntil: 60, priority: 'medium' },
@@ -45,6 +73,7 @@ const UserHomeScreen = () => {
 
   // ESTADOS
   const [myVehicle, setMyVehicle] = useState<VehicleData | null>(null);
+  const [upcomingServices, setUpcomingServices] = useState<UpcomingService[]>([]);
   const [isModalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
@@ -58,7 +87,12 @@ const UserHomeScreen = () => {
   useEffect(() => {
     if (!user) return;
     const unsubscribe = VehiclesService.subscribeUserVehicles(user.uid, (vehicles) => {
-      setMyVehicle(vehicles.length > 0 ? (vehicles[0] as VehicleData) : null);
+      const vehicle = vehicles.length > 0 ? (vehicles[0] as VehicleData) : null;
+      setMyVehicle(vehicle);
+      // Calcular los próximos servicios basados en el kilometraje actual
+      if (vehicle && vehicle.currentKm) {
+        setUpcomingServices(calculateUpcomingServices(vehicle.currentKm));
+      }
     });
     return () => unsubscribe();
   }, [user]);
@@ -179,7 +213,7 @@ const UserHomeScreen = () => {
           <Text className="text-lg font-semibold text-gray-800">Próximos Servicios</Text>
         </View>
         <FlatList
-          data={defaultUpcomingServices}
+          data={myVehicle ? upcomingServices : defaultUpcomingServices}
           renderItem={renderServiceCard}
           keyExtractor={(item) => item.id}
           scrollEnabled={false}
