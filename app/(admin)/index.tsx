@@ -54,22 +54,30 @@ const AdminScreen = () => {
     )
   }
 
+  // 🔥 MARCAR DÍAS CON CITAS (usando dateISO)
   const markedDates = confirmedAppointments.reduce((acc, appointment) => {
-    const date = appointment.date
+    const date = appointment.dateISO // 👈 CAMBIO IMPORTANTE
+    if (!date) return acc
+
     if (!acc[date]) {
       acc[date] = { marked: true, dotColor: 'blue' }
     }
     return acc
   }, {} as any)
 
-  const selectedDayAppointments = confirmedAppointments.filter(app => app.date === selectedDate)
+  // 🔥 FILTRAR CITAS POR DÍA (usando dateISO)
+  const selectedDayAppointments = confirmedAppointments.filter(
+    (app) => app.dateISO === selectedDate // 👈 CAMBIO IMPORTANTE
+  )
 
-  const menuItems = [
-    { label: 'Usuarios', icon: '👥' },
-    { label: 'Servicios', icon: '🔧' },
-    { label: 'Citas', icon: '📅' },
-    { label: 'Reportes', icon: '📊' },
-  ]
+  // 🔍 DEBUG (puedes borrarlo después)
+  useEffect(() => {
+    if (!selectedDate) return
+
+    console.log("Selected:", selectedDate)
+    console.log("Confirmed:", confirmedAppointments)
+    console.log("Filtradas:", selectedDayAppointments)
+  }, [selectedDate, confirmedAppointments])
 
   return (
     <ScrollView className="flex-1 bg-white p-6">
@@ -77,36 +85,25 @@ const AdminScreen = () => {
 
       {/* --- SOLICITUDES DE ALTA --- */}
       <View className="mb-8">
-        <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-sm font-bold text-blue-600 uppercase tracking-widest">
-            Solicitudes de Alta
-          </Text>
-          <View className="bg-blue-100 px-2 py-1 rounded-full">
-            <Text className="text-blue-600 text-xs font-bold">{pendingRequests.length}</Text>
-          </View>
-        </View>
+        <Text className="text-sm font-bold text-blue-600 uppercase tracking-widest mb-4">
+          Solicitudes de Alta
+        </Text>
 
         {pendingRequests.length === 0 ? (
-          <View className="bg-gray-50 p-6 rounded-xl border border-gray-100 items-center">
-            <Text className="text-gray-400">No hay solicitudes pendientes</Text>
-          </View>
+          <Text className="text-gray-400">No hay solicitudes pendientes</Text>
         ) : (
           pendingRequests.map((item) => (
-            <View key={item.id} className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4">
-              <View className="mb-3">
-                <Text className="text-lg font-bold text-gray-800">{item.model}</Text>
-                <Text className="text-gray-500 text-sm">
-                  Año: {item.year} • Placa: {item.plate}
-                </Text>
-                <Text className="text-gray-400 text-xs mt-1">KM Inicial: {item.currentKm}</Text>
-              </View>
-              <View className="flex-row gap-2">
+            <View key={item.id} className="bg-gray-50 p-4 rounded-xl border mb-4">
+              <Text className="font-bold">{item.model}</Text>
+
+              <View className="flex-row gap-2 mt-3">
                 <TouchableOpacity
                   onPress={() => handleApprove(item.id, item.model)}
-                  className="bg-green-600 flex-1 py-3 rounded-lg shadow-sm"
+                  className="bg-green-600 flex-1 py-3 rounded-lg"
                 >
                   <Text className="text-white text-center font-bold">Aprobar</Text>
                 </TouchableOpacity>
+
                 <TouchableOpacity
                   onPress={() => handleReject(item.id)}
                   className="bg-red-100 flex-1 py-3 rounded-lg"
@@ -121,90 +118,71 @@ const AdminScreen = () => {
 
       {/* --- CITAS PENDIENTES --- */}
       <View className="mb-8">
-        <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-sm font-bold text-orange-600 uppercase tracking-widest">
-            Citas Pendientes
-          </Text>
-          <View className="bg-orange-100 px-2 py-1 rounded-full">
-            <Text className="text-orange-600 text-xs font-bold">{pendingAppointments.length}</Text>
-          </View>
-        </View>
+        <Text className="text-sm font-bold text-orange-600 uppercase tracking-widest mb-4">
+          Citas Pendientes
+        </Text>
 
-        {pendingAppointments.length === 0 ? (
-          <View className="bg-gray-50 p-6 rounded-xl border border-gray-100 items-center">
-            <Text className="text-gray-400">No hay citas pendientes</Text>
-          </View>
-        ) : (
-          pendingAppointments.map((item) => (
-            <View key={item.id} className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4">
-              <Text className="text-lg font-bold text-gray-800 mb-1">{item.serviceName}</Text>
-              <Text className="text-gray-500 text-sm">👤 {item.userEmail}</Text>
-              <Text className="text-gray-500 text-sm">📅 {item.date}  🕐 {item.time}</Text>
-              <View className="flex-row gap-2 mt-3">
-                <TouchableOpacity
-                  onPress={() =>
-                    AppointmentsService.confirmAppointment(item.id!).catch(() =>
-                      Alert.alert("Error", "No se pudo confirmar")
-                    )
-                  }
-                  className="bg-green-600 flex-1 py-3 rounded-lg"
-                >
-                  <Text className="text-white text-center font-bold">Confirmar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() =>
-                    Alert.alert("Rechazar cita", "¿Seguro que deseas rechazar esta cita?", [
-                      { text: "Cancelar", style: "cancel" },
-                      {
-                        text: "Rechazar",
-                        style: "destructive",
-                        onPress: () =>
-                          AppointmentsService.rejectAppointment(item.id!).catch(() =>
-                            Alert.alert("Error", "No se pudo rechazar")
-                          ),
-                      },
-                    ])
-                  }
-                  className="bg-red-100 flex-1 py-3 rounded-lg"
-                >
-                  <Text className="text-red-600 text-center font-bold">Rechazar</Text>
-                </TouchableOpacity>
-              </View>
+        {pendingAppointments.map((item) => (
+          <View key={item.id} className="bg-gray-50 p-4 rounded-xl border mb-4">
+            <Text className="font-bold">{item.serviceName}</Text>
+            <Text>👤 {item.userEmail}</Text>
+            <Text>📅 {item.date} 🕐 {item.time}</Text>
+
+            <View className="flex-row gap-2 mt-3">
+              <TouchableOpacity
+                onPress={() => AppointmentsService.confirmAppointment(item.id!)}
+                className="bg-green-600 flex-1 py-3 rounded-lg"
+              >
+                <Text className="text-white text-center font-bold">Confirmar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => AppointmentsService.rejectAppointment(item.id!)}
+                className="bg-red-100 flex-1 py-3 rounded-lg"
+              >
+                <Text className="text-red-600 text-center font-bold">Rechazar</Text>
+              </TouchableOpacity>
             </View>
-          ))
-        )}
+          </View>
+        ))}
       </View>
 
-      {/* --- CALENDARIO DE CITAS --- */}
+      {/* --- CALENDARIO --- */}
       <View className="mb-8">
         <Text className="text-sm font-bold text-green-600 uppercase tracking-widest mb-4">
           Calendario de Citas Confirmadas
         </Text>
+
         <Calendar
           markedDates={{
             ...markedDates,
-            [selectedDate]: { selected: true, marked: markedDates[selectedDate]?.marked, selectedColor: 'green' }
+            [selectedDate]: {
+              selected: true,
+              selectedColor: 'green'
+            }
           }}
-          onDayPress={(day) => setSelectedDate(day.dateString)}
-          theme={{
-            selectedDayBackgroundColor: 'green',
-            todayTextColor: 'red',
-            arrowColor: 'green',
+          onDayPress={(day) => {
+            console.log("Día presionado:", day.dateString)
+            setSelectedDate(day.dateString)
           }}
         />
+
         {selectedDate && (
           <View className="mt-4">
-            <Text className="text-lg font-bold text-gray-800 mb-2">
-              Citas para {selectedDate}:
+            <Text className="text-lg font-bold mb-2">
+              Citas para {selectedDate}
             </Text>
+
             {selectedDayAppointments.length === 0 ? (
-              <Text className="text-gray-400">No hay citas para este día</Text>
+              <Text className="text-gray-400">
+                No hay citas para este día
+              </Text>
             ) : (
               selectedDayAppointments.map((item) => (
-                <View key={item.id} className="bg-green-50 p-3 rounded-lg border border-green-200 mb-2">
-                  <Text className="text-md font-bold text-gray-800">{item.serviceName}</Text>
-                  <Text className="text-gray-600 text-sm">👤 {item.userEmail}</Text>
-                  <Text className="text-gray-600 text-sm">🕐 {item.time}</Text>
+                <View key={item.id} className="bg-green-50 p-3 rounded-lg border mb-2">
+                  <Text className="font-bold">{item.serviceName}</Text>
+                  <Text>👤 {item.userEmail}</Text>
+                  <Text>🕐 {item.time}</Text>
                 </View>
               ))
             )}
@@ -212,26 +190,10 @@ const AdminScreen = () => {
         )}
       </View>
 
-      {/* --- GESTIÓN GENERAL --- */}
-      <Text className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">
-        Gestión General
-      </Text>
-      <View className="gap-4">
-        {menuItems.map((item, index) => (
-          <TouchableOpacity
-            key={index}
-            className="bg-gray-100 p-4 rounded-lg flex-row items-center"
-          >
-            <Text className="text-3xl mr-4">{item.icon}</Text>
-            <Text className="text-lg font-semibold text-gray-800 flex-1">{item.label}</Text>
-            <Text className="text-gray-400">›</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
+      {/* --- CERRAR SESIÓN --- */}
       <TouchableOpacity
         onPress={() => router.replace('/(auth)/login')}
-        className="mt-10 mb-10 bg-red-500 py-4 rounded-lg shadow-sm"
+        className="mt-10 mb-10 bg-red-500 py-4 rounded-lg"
       >
         <Text className="text-white text-center font-bold">Cerrar Sesión</Text>
       </TouchableOpacity>

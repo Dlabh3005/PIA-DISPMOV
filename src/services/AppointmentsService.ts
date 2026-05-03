@@ -1,16 +1,19 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   onSnapshot,
   query,
   Timestamp,
-  updateDoc,
+  updateDoc, // Añadimos deleteDoc para poder eliminar
   where,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 
 const COLLECTION = "appointments";
+
+type AppointmentStatus = "pending" | "confirmed" | "rejected";
 
 export interface Appointment {
   id?: string;
@@ -18,8 +21,9 @@ export interface Appointment {
   userEmail: string;
   serviceName: string;
   date: string;
+  dateISO: string;
   time: string;
-  status: "pending" | "confirmed" | "rejected";
+  status: AppointmentStatus;
   createdAt: any;
 }
 
@@ -78,6 +82,11 @@ export const AppointmentsService = {
   // Admin aprueba la cita
   async confirmAppointment(id: string) {
     return await updateDoc(doc(db, COLLECTION, id), { status: "confirmed" });
+  },
+
+  // --- MÉTODO AGREGADO PARA RECHAZAR/ELIMINAR ---
+  async rejectAppointment(id: string) {
+    return await deleteDoc(doc(db, COLLECTION, id));
   },
 
   // Admin: escucha todas las citas confirmadas en tiempo real

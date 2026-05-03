@@ -64,6 +64,18 @@ const validateSchedule = (dateStr: string, timeStr: string): string | null => {
   return null; // Todo válido
 };
 
+const normalizeDate = (dateStr: string) => {
+  const [day, month, year] = dateStr.split("/");
+
+  const dd = day.padStart(2, "0");
+  const mm = month.padStart(2, "0");
+
+  return {
+    display: `${dd}/${mm}/${year}`,
+    iso: `${year}-${mm}-${dd}`,
+  };
+};
+
 const AppointmentsScreen = () => {
   const user = auth.currentUser;
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -84,37 +96,41 @@ const AppointmentsScreen = () => {
   }, [user]);
 
   const handleCreate = async () => {
-    if (!selectedService || !date.trim() || !time.trim()) {
-      Alert.alert("Error", "Selecciona un servicio, fecha y hora.");
-      return;
-    }
+  if (!selectedService || !date.trim() || !time.trim()) {
+    Alert.alert("Error", "Selecciona un servicio, fecha y hora.");
+    return;
+  }
 
-    const scheduleError = validateSchedule(date, time);
-    if (scheduleError) {
-      Alert.alert("Horario no disponible", scheduleError);
-      return;
-    }
+  const scheduleError = validateSchedule(date, time);
+  if (scheduleError) {
+    Alert.alert("Horario no disponible", scheduleError);
+    return;
+  }
 
-    setLoading(true);
-    try {
-      await AppointmentsService.createAppointment({
-        userId: user!.uid,
-        userEmail: user!.email ?? "",
-        serviceName: selectedService,
-        date: date.trim(),
-        time: time.trim(),
-      });
-      Alert.alert("✅ Cita enviada", "Tu cita quedó pendiente de confirmación.");
-      setModalVisible(false);
-      setSelectedService("");
-      setDate("");
-      setTime("");
-    } catch (e) {
-      Alert.alert("Error", "No se pudo crear la cita. Intenta de nuevo.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const normalized = normalizeDate(date.trim());
+
+  setLoading(true);
+  try {
+    await AppointmentsService.createAppointment({
+      userId: user!.uid,
+      userEmail: user!.email ?? "",
+      serviceName: selectedService,
+      date: normalized.display,
+      dateISO: normalized.iso,
+      time: time.trim(),
+    });
+
+    Alert.alert("✅ Cita enviada", "Tu cita quedó pendiente de confirmación.");
+    setModalVisible(false);
+    setSelectedService("");
+    setDate("");
+    setTime("");
+  } catch (e) {
+    Alert.alert("Error", "No se pudo crear la cita. Intenta de nuevo.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const statusStyle = (status: string) => {
     if (status === "confirmed") return { bg: "bg-green-100", text: "text-green-700", label: "✅ Confirmada" };
