@@ -67,23 +67,26 @@ const VehicleCard = ({ vehicle }: { vehicle: Vehicle }) => (
 )
 
 // ─── Sub-component: No vehicle registered ────────────────────────────────────
-const NoVehicleCard = ({ onAdd }: { onAdd: () => void }) => (
-  <View className="bg-gray-50 border-2 border-dashed border-gray-200 p-6 rounded-2xl mb-4 items-center">
-    <Text className="text-4xl mb-3">🚘</Text>
-    <Text className="text-gray-700 font-bold text-base mb-1">Sin vehículo registrado</Text>
-    <Text className="text-gray-400 text-sm text-center mb-4">
-      Aún no has agregado ningún vehículo a tu perfil. ¡Añade uno para comenzar!
-    </Text>
-    <TouchableOpacity
-      onPress={onAdd}
-      className="bg-blue-500 px-6 py-3 rounded-xl flex-row items-center"
-      activeOpacity={0.8}
-    >
-      <Text className="text-white font-bold mr-2">+</Text>
-      <Text className="text-white font-bold">Agregar vehículo</Text>
-    </TouchableOpacity>
-  </View>
-)
+const NoVehicleCard = () => {
+  const router = useRouter()
+  return (
+    <View className="bg-gray-50 border-2 border-dashed border-gray-200 p-6 rounded-2xl mb-4 items-center">
+      <Text className="text-4xl mb-3">🚘</Text>
+      <Text className="text-gray-700 font-bold text-base mb-1">Sin vehículo registrado</Text>
+      <Text className="text-gray-400 text-sm text-center mb-4">
+        Aún no has agregado ningún vehículo a tu perfil. ¡Añade uno para comenzar!
+      </Text>
+      <TouchableOpacity
+        onPress={() => router.push('/')}
+        className="bg-blue-500 px-6 py-3 rounded-xl flex-row items-center"
+        activeOpacity={0.8}
+      >
+        <Text className="text-white font-bold mr-2">+</Text>
+        <Text className="text-white font-bold">Agregar vehículo</Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 const ProfileScreen = () => {
@@ -177,14 +180,6 @@ const ProfileScreen = () => {
             {vehicles.map((v) => (
               <VehicleCard key={v.id} vehicle={v} />
             ))}
-            {/* Allow adding another vehicle */}
-            <TouchableOpacity
-              onPress={handleAddVehicle}
-              className="border border-blue-300 py-3 rounded-2xl items-center mt-1"
-              activeOpacity={0.7}
-            >
-              <Text className="text-blue-500 font-semibold text-sm">+ Agregar otro vehículo</Text>
-            </TouchableOpacity>
           </>
         )}
       </View>
