@@ -30,6 +30,8 @@ export interface Appointment {
   createdAt: any;
   /** Kilometraje del vehículo en el momento en que se realizó el servicio */
   mileageAtService?: number;
+  /** Costo del servicio en pesos MXN (lo registra el admin al confirmar) */
+  cost?: number;
 }
 
 export const AppointmentsService = {

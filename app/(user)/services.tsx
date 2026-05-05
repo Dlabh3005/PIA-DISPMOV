@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { FlatList, Text, TouchableOpacity, View } from "react-native";
+import { SERVICE_CATALOG, PRICE_MAP } from "../../src/constants/serviceCatalog";
 import { ServicesService } from "../../src/services/servicesService";
 
 function ServicesScreen() {
@@ -9,13 +10,49 @@ function ServicesScreen() {
   const [expandedService, setExpandedService] = useState<string | null>(null);
 
   useEffect(() => {
+    /** Normaliza un nombre para comparación insensible a mayúsculas/espacios */
+    const norm = (s: string) => s.trim().toLowerCase();
+
+    // Nombres retirados (normalizados): existen en Firestore pero ya no deben mostrarse
+    const EXCLUDED = new Set([
+      "cambio de llantas",
+      "alineación y balanceo",
+      "frenos",
+    ].map(norm));
 
     const unsubscribe = ServicesService.subscribeServices((data: any[]) => {
-      setServices(data);
+      // Conjunto de nombres del catálogo (normalizados) para deduplicar Firestore
+      const catalogNorms = new Set(SERVICE_CATALOG.map((s) => norm(s.name)));
+
+      // Documentos de Firestore que NO están en el catálogo ni en excluidos
+      const firestoreExtra = data.filter(
+        (d) => !catalogNorms.has(norm(d.name ?? "")) && !EXCLUDED.has(norm(d.name ?? ""))
+      );
+
+      const merged = [
+        // Primero: todos los del catálogo estático (precio/emoji oficial)
+        ...SERVICE_CATALOG.map((cat) => {
+          const fsDoc = data.find((d) => norm(d.name) === norm(cat.name));
+          return {
+            id: fsDoc?.id ?? cat.name,
+            name: cat.name,
+            price: `$${cat.price.toLocaleString("es-MX")}`,
+            duration: cat.duration,
+            emoji: cat.emoji,
+          };
+        }),
+        // Después: extras de Firestore que no coinciden con ningún catálogo
+        ...firestoreExtra.map((d) => ({
+          id: d.id,
+          name: d.name,
+          price: d.price ?? "",
+          duration: d.duration ?? "",
+          emoji: "🔧",
+        })),
+      ];
+      setServices(merged);
     });
-
     return unsubscribe;
-
   }, []);
 
   const toggleService = (id: string) => {
@@ -42,7 +79,7 @@ function ServicesScreen() {
           <View className="flex-1">
 
             <Text className="text-xl font-bold text-gray-800 mb-1">
-              {item.name}
+              {item.emoji ? `${item.emoji} ` : ""}{item.name}
             </Text>
 
             <Text className="text-gray-500 text-sm">

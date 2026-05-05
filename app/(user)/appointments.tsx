@@ -20,8 +20,7 @@ const AVAILABLE_SERVICES = [
   "Cambio de aceite",
   "Revisión general",
   "Cambio de frenos",
-  "Alineación y balanceo",
-  "Cambio de llantas",
+  "Alineación",
   "Diagnóstico electrónico",
 ];
 
@@ -97,50 +96,50 @@ const AppointmentsScreen = () => {
   }, [user]);
 
   const handleCreate = async () => {
-  if (!selectedService || !date.trim() || !time.trim()) {
-    Alert.alert("Error", "Selecciona un servicio, fecha y hora.");
-    return;
-  }
+    if (!selectedService || !date.trim() || !time.trim()) {
+      Alert.alert("Error", "Selecciona un servicio, fecha y hora.");
+      return;
+    }
 
-  const scheduleError = validateSchedule(date, time);
-  if (scheduleError) {
-    Alert.alert("Horario no disponible", scheduleError);
-    return;
-  }
+    const scheduleError = validateSchedule(date, time);
+    if (scheduleError) {
+      Alert.alert("Horario no disponible", scheduleError);
+      return;
+    }
 
-  const normalized = normalizeDate(date.trim());
+    const normalized = normalizeDate(date.trim());
 
-  setLoading(true);
-  try {
-    await AppointmentsService.createAppointment({
-      userId: user!.uid,
-      userEmail: user!.email ?? "",
-      serviceName: selectedService,
-      date: normalized.display,
-      dateISO: normalized.iso,
-      time: time.trim(),
-      ...(mileageAtService.trim() !== "" && !isNaN(Number(mileageAtService))
-        ? { mileageAtService: Number(mileageAtService) }
-        : {}),
-    });
+    setLoading(true);
+    try {
+      await AppointmentsService.createAppointment({
+        userId: user!.uid,
+        userEmail: user!.email ?? "",
+        serviceName: selectedService,
+        date: normalized.display,
+        dateISO: normalized.iso,
+        time: time.trim(),
+        ...(mileageAtService.trim() !== "" && !isNaN(Number(mileageAtService))
+          ? { mileageAtService: Number(mileageAtService) }
+          : {}),
+      });
 
-    Alert.alert("✅ Cita enviada", "Tu cita quedó pendiente de confirmación.");
-    setModalVisible(false);
-    setSelectedService("");
-    setDate("");
-    setTime("");
-    setMileageAtService("");
-  } catch (e) {
-    Alert.alert("Error", "No se pudo crear la cita. Intenta de nuevo.");
-  } finally {
-    setLoading(false);
-  }
-};
+      Alert.alert("✅ Cita enviada", "Tu cita quedó pendiente de confirmación.");
+      setModalVisible(false);
+      setSelectedService("");
+      setDate("");
+      setTime("");
+      setMileageAtService("");
+    } catch (e) {
+      Alert.alert("Error", "No se pudo crear la cita. Intenta de nuevo.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const statusStyle = (status: string) => {
     if (status === "confirmed") return { bg: "bg-green-100", text: "text-green-700", label: "✅ Confirmada" };
-    if (status === "rejected")  return { bg: "bg-red-100",   text: "text-red-700",   label: "❌ Rechazada"  };
-    return                             { bg: "bg-yellow-100", text: "text-yellow-700", label: "⏳ Pendiente"  };
+    if (status === "rejected") return { bg: "bg-red-100", text: "text-red-700", label: "❌ Rechazada" };
+    return { bg: "bg-yellow-100", text: "text-yellow-700", label: "⏳ Pendiente" };
   };
 
   const renderItem = ({ item }: { item: Appointment }) => {
@@ -213,11 +212,10 @@ const AppointmentsScreen = () => {
                 <TouchableOpacity
                   key={s}
                   onPress={() => setSelectedService(s)}
-                  className={`mr-2 px-4 py-2 rounded-full border ${
-                    selectedService === s
-                      ? "bg-blue-600 border-blue-600"
-                      : "bg-white border-gray-300"
-                  }`}
+                  className={`mr-2 px-4 py-2 rounded-full border ${selectedService === s
+                    ? "bg-blue-600 border-blue-600"
+                    : "bg-white border-gray-300"
+                    }`}
                 >
                   <Text className={`text-sm font-medium ${selectedService === s ? "text-white" : "text-gray-700"}`}>
                     {s}
