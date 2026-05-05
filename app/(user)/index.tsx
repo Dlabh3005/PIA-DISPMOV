@@ -28,43 +28,55 @@ interface VehicleData {
 interface UpcomingService {
   id: string;
   service: string;
-  dueKm: number;
-  daysUntil: number;
+  kmRemaining: number;   // km que faltan para el próximo servicio
+  interval: number;      // intervalo fijo del tipo de servicio
   priority: 'high' | 'medium' | 'low';
 }
 
 // Intervalos de servicio en km
 const SERVICE_INTERVALS = {
-  oilChange: 6000,      // Cambio de aceite: cada 6000 km
-  generalReview: 20000, // Revisión general: cada 20000 km
-  brakeChange: 16000    // Cambio de frenos: cada 16000 km
+  oilChange: 8_000,  // Cambio de aceite: cada 8,000 km
+  generalReview: 15_000, // Revisión general: cada 15,000 km
+  brakeChange: 25_000, // Cambio de frenos: cada 25,000 km
 };
 
-// Función para calcular los próximos servicios basados en el kilometraje actual
+/** Determina prioridad (semáforo) según porcentaje del intervalo restante.
+ *  > 50% restante  → verde  (low)
+ *  20–50% restante → amarillo (medium)
+ *  ≤ 20% restante  → rojo   (high)
+ */
+const getPriority = (kmRemaining: number, interval: number): 'high' | 'medium' | 'low' => {
+  const ratio = kmRemaining / interval;
+  if (ratio <= 0.2) return 'high';
+  if (ratio <= 0.5) return 'medium';
+  return 'low';
+};
+
+/** Calcula los próximos 3 servicios usando:
+ *  km_restantes = intervalo - (km_actual % intervalo)
+ *  Si no hay historial (km_actual === 0), muestra el intervalo completo.
+ */
 const calculateUpcomingServices = (currentKm: number): UpcomingService[] => {
-  // Calcular próximo cambio de aceite (cada 6000 km)
-  const nextOilChange = Math.ceil(currentKm / SERVICE_INTERVALS.oilChange) * SERVICE_INTERVALS.oilChange;
-  const daysUntilOil = Math.ceil((nextOilChange - currentKm) / 100); // Aproximación: 100km/día
-
-  // Calcular próxima revisión general (cada 20000 km)
-  const nextReview = Math.ceil(currentKm / SERVICE_INTERVALS.generalReview) * SERVICE_INTERVALS.generalReview;
-  const daysUntilReview = Math.ceil((nextReview - currentKm) / 100);
-
-  // Calcular próximo cambio de frenos (cada 16000 km)
-  const nextBrake = Math.ceil(currentKm / SERVICE_INTERVALS.brakeChange) * SERVICE_INTERVALS.brakeChange;
-  const daysUntilBrake = Math.ceil((nextBrake - currentKm) / 100);
-
-  return [
-    { id: '1', service: 'Cambio de aceite', dueKm: nextOilChange, daysUntil: daysUntilOil, priority: 'high' },
-    { id: '2', service: 'Revisión general', dueKm: nextReview, daysUntil: daysUntilReview, priority: 'medium' },
-    { id: '3', service: 'Cambio de frenos', dueKm: nextBrake, daysUntil: daysUntilBrake, priority: 'low' },
+  const services = [
+    { id: '1', service: 'Cambio de aceite', interval: SERVICE_INTERVALS.oilChange },
+    { id: '2', service: 'Revisión general', interval: SERVICE_INTERVALS.generalReview },
+    { id: '3', service: 'Cambio de frenos', interval: SERVICE_INTERVALS.brakeChange },
   ];
+
+  return services.map(({ id, service, interval }) => {
+    const kmRemaining = currentKm === 0
+      ? interval
+      : interval - (currentKm % interval);
+    const priority = getPriority(kmRemaining, interval);
+    return { id, service, kmRemaining, interval, priority };
+  });
 };
 
+// Servicios por defecto cuando no hay vehículo registrado
 const defaultUpcomingServices: UpcomingService[] = [
-  { id: '1', service: 'Cambio de aceite', dueKm: 50000, daysUntil: 30, priority: 'high' },
-  { id: '2', service: 'Revisión general', dueKm: 60000, daysUntil: 60, priority: 'medium' },
-  { id: '3', service: 'Cambio de frenos', dueKm: 70000, daysUntil: 90, priority: 'low' },
+  { id: '1', service: 'Cambio de aceite', kmRemaining: SERVICE_INTERVALS.oilChange, interval: SERVICE_INTERVALS.oilChange, priority: 'low' },
+  { id: '2', service: 'Revisión general', kmRemaining: SERVICE_INTERVALS.generalReview, interval: SERVICE_INTERVALS.generalReview, priority: 'low' },
+  { id: '3', service: 'Cambio de frenos', kmRemaining: SERVICE_INTERVALS.brakeChange, interval: SERVICE_INTERVALS.brakeChange, priority: 'low' },
 ];
 
 const UserHomeScreen = () => {
@@ -160,31 +172,51 @@ const UserHomeScreen = () => {
     ]);
   };
 
-  // Funciones auxiliares de estilo (Mantenidas de tu original)
-  const getProgressColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'bg-red-500';
-      case 'medium': return 'bg-yellow-500';
-      case 'low': return 'bg-green-500';
-      default: return 'bg-blue-500';
-    }
+  // Colores del semáforo por prioridad
+  const trafficLight = {
+    high: { dot: '#EF4444', bar: 'bg-red-500', label: 'Urgente', bg: 'bg-red-50', border: 'border-red-200' },
+    medium: { dot: '#F59E0B', bar: 'bg-yellow-400', label: 'Próximo', bg: 'bg-yellow-50', border: 'border-yellow-200' },
+    low: { dot: '#22C55E', bar: 'bg-green-500', label: 'Al día', bg: 'bg-green-50', border: 'border-green-200' },
   };
 
   const renderServiceCard = ({ item }: { item: UpcomingService }) => {
-    const currentKm = myVehicle?.currentKm || 0;
-    const kmRemaining = item.dueKm - currentKm;
-    const progress = Math.max(0, Math.min(100, (currentKm / item.dueKm) * 100));
+    const colors = trafficLight[item.priority];
+    // porcentaje CONSUMIDO del intervalo (para la barra de progreso)
+    const consumed = Math.max(0, Math.min(100, ((item.interval - item.kmRemaining) / item.interval) * 100));
 
     return (
-      <View className="bg-white rounded-lg p-4 mb-3 border border-gray-200">
-        <View className="flex-row items-start justify-between mb-3">
-          <View className="flex-1">
-            <Text className="text-base font-semibold text-gray-800 mb-1">{item.service}</Text>
-            <Text className="text-sm text-gray-500">En {kmRemaining.toLocaleString()} km</Text>
+      <View className={`rounded-2xl p-4 mb-3 border ${colors.bg} ${colors.border}`}>
+        <View className="flex-row items-center justify-between mb-2">
+          {/* Semáforo + Nombre */}
+          <View className="flex-row items-center flex-1">
+            <View
+              style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: colors.dot, marginRight: 8 }}
+            />
+            <Text className="text-base font-semibold text-gray-800 flex-1">{item.service}</Text>
+          </View>
+          {/* Badge de prioridad */}
+          <View style={{ backgroundColor: colors.dot + '22', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99 }}>
+            <Text style={{ color: colors.dot, fontSize: 11, fontWeight: '700' }}>{colors.label}</Text>
           </View>
         </View>
-        <View className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-          <View className={`h-full ${getProgressColor(item.priority)}`} style={{ width: `${progress}%` }} />
+
+        {/* km restantes */}
+        <Text className="text-sm text-gray-500 mb-3 ml-5">
+          Faltan{' '}
+          <Text className="font-bold text-gray-700">{item.kmRemaining.toLocaleString()} km</Text>
+          {' '}para el próximo servicio
+        </Text>
+
+        {/* Barra de progreso */}
+        <View className="w-full h-2 bg-white/60 rounded-full overflow-hidden border border-white">
+          <View
+            className={`h-full rounded-full ${colors.bar}`}
+            style={{ width: `${consumed}%` }}
+          />
+        </View>
+        <View className="flex-row justify-between mt-1">
+          <Text className="text-xs text-gray-400">0 km</Text>
+          <Text className="text-xs text-gray-400">{item.interval.toLocaleString()} km</Text>
         </View>
       </View>
     );
