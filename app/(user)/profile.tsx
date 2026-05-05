@@ -1,201 +1,211 @@
 import { useRouter } from 'expo-router'
 import React, { useState } from 'react'
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native'
+import { useUserProfile, Vehicle } from '../../hooks/useUserProfile'
+import { authService } from '../../src/services/authService'
 
+// ─── Sub-component: Loading skeleton ─────────────────────────────────────────
+const LoadingCard = () => (
+  <View className="bg-gray-100 p-5 rounded-2xl mb-4 items-center justify-center" style={{ minHeight: 120 }}>
+    <ActivityIndicator size="large" color="#3B82F6" />
+    <Text className="text-gray-400 mt-3 text-sm">Cargando información...</Text>
+  </View>
+)
+
+// ─── Sub-component: Error card ────────────────────────────────────────────────
+const ErrorCard = ({ message }: { message: string }) => (
+  <View className="bg-red-50 border border-red-200 p-4 rounded-2xl mb-4 flex-row items-start">
+    <Text className="text-red-500 text-lg mr-2">⚠️</Text>
+    <View className="flex-1">
+      <Text className="text-red-700 font-semibold text-sm">Error al cargar datos</Text>
+      <Text className="text-red-500 text-sm mt-1">{message}</Text>
+    </View>
+  </View>
+)
+
+// ─── Sub-component: Info row ──────────────────────────────────────────────────
+const InfoRow = ({ label, value }: { label: string; value: string }) => (
+  <View className="mb-3">
+    <Text className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">
+      {label}
+    </Text>
+    <Text className="text-gray-800 text-base font-medium">{value}</Text>
+  </View>
+)
+
+// ─── Sub-component: Vehicle card ─────────────────────────────────────────────
+const VehicleCard = ({ vehicle }: { vehicle: Vehicle }) => (
+  <View className="bg-blue-50 border border-blue-100 p-4 rounded-2xl mb-3">
+    <View className="flex-row items-center mb-3">
+      <Text className="text-2xl mr-2">🚗</Text>
+      <Text className="text-blue-800 font-bold text-base flex-1" numberOfLines={1}>
+        {vehicle.model} {vehicle.year}
+      </Text>
+      {vehicle.status === 'approved' && (
+        <View className="bg-green-100 px-2 py-1 rounded-full">
+          <Text className="text-green-700 text-xs font-semibold">Aprobado</Text>
+        </View>
+      )}
+      {vehicle.status === 'pending' && (
+        <View className="bg-yellow-100 px-2 py-1 rounded-full">
+          <Text className="text-yellow-700 text-xs font-semibold">Pendiente</Text>
+        </View>
+      )}
+    </View>
+    <View className="flex-row gap-4">
+      <InfoRow label="Placa" value={vehicle.plate || '—'} />
+      <InfoRow label="Kilometraje" value={`${vehicle.currentKm?.toLocaleString() ?? '—'} km`} />
+    </View>
+  </View>
+)
+
+// ─── Sub-component: No vehicle registered ────────────────────────────────────
+const NoVehicleCard = ({ onAdd }: { onAdd: () => void }) => (
+  <View className="bg-gray-50 border-2 border-dashed border-gray-200 p-6 rounded-2xl mb-4 items-center">
+    <Text className="text-4xl mb-3">🚘</Text>
+    <Text className="text-gray-700 font-bold text-base mb-1">Sin vehículo registrado</Text>
+    <Text className="text-gray-400 text-sm text-center mb-4">
+      Aún no has agregado ningún vehículo a tu perfil. ¡Añade uno para comenzar!
+    </Text>
+    <TouchableOpacity
+      onPress={onAdd}
+      className="bg-blue-500 px-6 py-3 rounded-xl flex-row items-center"
+      activeOpacity={0.8}
+    >
+      <Text className="text-white font-bold mr-2">+</Text>
+      <Text className="text-white font-bold">Agregar vehículo</Text>
+    </TouchableOpacity>
+  </View>
+)
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
 const ProfileScreen = () => {
   const router = useRouter()
-  const [isEditing, setIsEditing] = useState(false)
-  const [profile, setProfile] = useState({
-    name: 'Juan Pérez',
-    email: 'juan@example.com',
-    phone: '+34 666 123 456',
-    vehicle: 'Toyota Corolla 2020',
-  })
+  const { user, vehicles, loading, error } = useUserProfile()
+  const [loggingOut, setLoggingOut] = useState(false)
 
-  const handleLogout = () => {
-    // TODO: Implementar lógica de logout
-    router.push('/')
+  const handleLogout = async () => {
+    Alert.alert(
+      'Cerrar sesión',
+      '¿Estás seguro de que deseas cerrar sesión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Cerrar sesión',
+          style: 'destructive',
+          onPress: async () => {
+            setLoggingOut(true)
+            try {
+              await authService.logout()
+              router.replace('/login')
+            } catch {
+              Alert.alert('Error', 'No se pudo cerrar sesión. Intenta de nuevo.')
+            } finally {
+              setLoggingOut(false)
+            }
+          },
+        },
+      ]
+    )
   }
 
+  const handleAddVehicle = () => {
+    // Navigate to vehicle registration screen
+    router.push('/(user)/index')
+  }
+
+  // Avatar initials
+  const initials = user?.email ? user.email[0].toUpperCase() : '?'
+
   return (
-    <ScrollView className="flex-1 bg-white p-6">
+    <ScrollView
+      className="flex-1 bg-white"
+      contentContainerStyle={{ padding: 24, paddingBottom: 48 }}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* ── Header / Avatar ───────────────────────── */}
       <View className="items-center mb-8">
-        <View className="w-20 h-20 bg-blue-500 rounded-full items-center justify-center mb-4">
-          <Text className="text-white text-3xl">👤</Text>
+        <View
+          className="w-24 h-24 rounded-full items-center justify-center mb-4"
+          style={{ backgroundColor: '#3B82F6' }}
+        >
+          <Text className="text-white text-4xl font-bold">{initials}</Text>
         </View>
-        <Text className="text-2xl font-bold text-gray-800">{profile.name}</Text>
+        <Text className="text-2xl font-bold text-gray-800">Mi Perfil</Text>
+        <Text className="text-gray-400 text-sm mt-1">Gestiona tu información personal</Text>
       </View>
 
-      <View className="bg-gray-100 p-4 rounded-lg mb-6">
-        <View className="mb-4">
-          <Text className="text-gray-700 font-semibold mb-2">Correo Electrónico</Text>
-          {isEditing ? (
-            <TextInput
-              value={profile.email}
-              onChangeText={(text) => setProfile({ ...profile, email: text })}
-              className="border border-gray-300 rounded-lg p-3 text-gray-800"
-              placeholderTextColor="#999"
-            />
+      {/* ── Account info ─────────────────────────── */}
+      <View className="mb-2">
+        <Text className="text-gray-800 font-bold text-base mb-3">📧 Cuenta</Text>
+        <View className="bg-gray-50 border border-gray-100 p-4 rounded-2xl">
+          {loading ? (
+            <LoadingCard />
+          ) : error ? (
+            <ErrorCard message={error} />
           ) : (
-            <Text className="text-gray-600">{profile.email}</Text>
-          )}
-        </View>
-
-        <View className="mb-4">
-          <Text className="text-gray-700 font-semibold mb-2">Teléfono</Text>
-          {isEditing ? (
-            <TextInput
-              value={profile.phone}
-              onChangeText={(text) => setProfile({ ...profile, phone: text })}
-              className="border border-gray-300 rounded-lg p-3 text-gray-800"
-              placeholderTextColor="#999"
+            <InfoRow
+              label="Correo electrónico"
+              value={user?.email ?? 'No disponible'}
             />
-          ) : (
-            <Text className="text-gray-600">{profile.phone}</Text>
-          )}
-        </View>
-
-        <View>
-          <Text className="text-gray-700 font-semibold mb-2">Vehículo</Text>
-          {isEditing ? (
-            <TextInput
-              value={profile.vehicle}
-              onChangeText={(text) => setProfile({ ...profile, vehicle: text })}
-              className="border border-gray-300 rounded-lg p-3 text-gray-800"
-              placeholderTextColor="#999"
-            />
-          ) : (
-            <Text className="text-gray-600">{profile.vehicle}</Text>
           )}
         </View>
       </View>
 
+      {/* ── Divider ───────────────────────────────── */}
+      <View className="h-px bg-gray-100 my-5" />
+
+      {/* ── Vehicle info ─────────────────────────── */}
+      <View className="mb-6">
+        <Text className="text-gray-800 font-bold text-base mb-3">🚗 Mis vehículos</Text>
+
+        {loading ? (
+          <LoadingCard />
+        ) : error ? (
+          <ErrorCard message={error} />
+        ) : vehicles.length === 0 ? (
+          <NoVehicleCard onAdd={handleAddVehicle} />
+        ) : (
+          <>
+            {vehicles.map((v) => (
+              <VehicleCard key={v.id} vehicle={v} />
+            ))}
+            {/* Allow adding another vehicle */}
+            <TouchableOpacity
+              onPress={handleAddVehicle}
+              className="border border-blue-300 py-3 rounded-2xl items-center mt-1"
+              activeOpacity={0.7}
+            >
+              <Text className="text-blue-500 font-semibold text-sm">+ Agregar otro vehículo</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+
+      {/* ── Logout button ─────────────────────────── */}
       <TouchableOpacity
-        onPress={() => setIsEditing(!isEditing)}
-        className={`py-3 rounded-lg mb-3 ${isEditing ? 'bg-green-500' : 'bg-blue-500'}`}
+        onPress={handleLogout}
+        disabled={loggingOut}
+        className="mt-2 bg-red-500 py-4 rounded-2xl shadow-sm flex-row items-center justify-center"
+        activeOpacity={0.8}
       >
-        <Text className="text-white text-center font-semibold">
-          {isEditing ? 'Guardar cambios' : 'Editar perfil'}
-        </Text>
+        {loggingOut ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <>
+            <Text className="text-white text-center font-bold text-base">Cerrar sesión</Text>
+          </>
+        )}
       </TouchableOpacity>
-
-      <TouchableOpacity
-  onPress={() => {
-    router.replace('/login');
-  }}
-  className="mt-10 mb-10 bg-red-500 py-4 rounded-lg shadow-sm"
->
-  <Text className="text-white text-center font-bold">
-    Cerrar Sesión
-  </Text>
-</TouchableOpacity>
     </ScrollView>
   )
 }
 
 export default ProfileScreen
-
-// React Native version of vehicle profile form
-
-interface VehicleData {
-  model: string
-  year: string
-  plate: string
-  currentKm: number
-  vin?: string
-  color?: string
-  fuelType?: string
-  transmission?: string
-}
-
-interface VehicleProfileProps {
-  vehicleData: VehicleData
-  onSave: (data: VehicleData) => void
-}
-
-export const VehicleProfile: React.FC<VehicleProfileProps> = ({ vehicleData, onSave }) => {
-  const [formData, setFormData] = useState<VehicleData>(vehicleData)
-  const [isSaving, setIsSaving] = useState(false)
-
-  const handleChange = (field: keyof VehicleData, value: string | number) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
-  const handleSubmit = () => {
-    setIsSaving(true)
-    setTimeout(() => {
-      onSave(formData)
-      setIsSaving(false)
-    }, 500)
-  }
-
-  return (
-    <ScrollView className="flex-1 bg-white p-6">
-      <View className="mb-6">
-        <Text className="text-2xl font-bold text-gray-800 mb-2">Perfil del Vehículo</Text>
-        <Text className="text-gray-600">Detalles técnicos de tu auto</Text>
-      </View>
-
-      {/* Section: Información básica */}
-      <View className="bg-gray-100 rounded-lg p-4 mb-6">
-        <View className="space-y-4">
-          <View>
-            <Text className="text-sm font-semibold text-gray-700 mb-1">Modelo *</Text>
-            <TextInput
-              value={formData.model}
-              onChangeText={text => handleChange('model', text)}
-              placeholder="Ej. Toyota Corolla"
-              className="border border-gray-300 rounded-lg p-3 text-gray-800"
-            />
-          </View>
-
-          <View className="flex-row gap-4">
-            <View className="flex-1">
-              <Text className="text-sm font-semibold text-gray-700 mb-1">Año *</Text>
-              <TextInput
-                value={formData.year}
-                onChangeText={text => handleChange('year', text)}
-                placeholder="2020"
-                className="border border-gray-300 rounded-lg p-3 text-gray-800"
-                keyboardType="numeric"
-              />
-            </View>
-            <View className="flex-1">
-              <Text className="text-sm font-semibold text-gray-700 mb-1">Placa *</Text>
-              <TextInput
-                value={formData.plate}
-                onChangeText={text => handleChange('plate', text.toUpperCase())}
-                placeholder="ABC-123"
-                className="border border-gray-300 rounded-lg p-3 text-gray-800"
-                autoCapitalize="characters"
-              />
-            </View>
-          </View>
-
-          <View>
-            <Text className="text-sm font-semibold text-gray-700 mb-1">Kilometraje Actual *</Text>
-            <TextInput
-              value={String(formData.currentKm)}
-              onChangeText={text => handleChange('currentKm', parseInt(text) || 0)}
-              placeholder="50000"
-              className="border border-gray-300 rounded-lg p-3 text-gray-800"
-              keyboardType="numeric"
-            />
-          </View>
-
-          {/* Additional optional fields could be added similarly */}
-        </View>
-      </View>
-
-      <TouchableOpacity
-        onPress={handleSubmit}
-        disabled={isSaving}
-        className={`py-3 rounded-lg mb-3 ${isSaving ? 'bg-gray-400' : 'bg-blue-500'}`}
-      >
-        <Text className="text-white text-center font-semibold">
-          {isSaving ? 'Guardando...' : 'Guardar'}
-        </Text>
-      </TouchableOpacity>
-    </ScrollView>
-  )
-}
