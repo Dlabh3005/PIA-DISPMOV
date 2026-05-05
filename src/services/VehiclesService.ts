@@ -43,6 +43,11 @@ async approveVehicle(vehicleId: string) {
     const docRef = doc(db, COLLECTION, vehicleId);
     return await updateDoc(docRef, { status: 'approved' });
   },
+  // Actualizar kilometraje actual del vehículo
+  async updateKilometrage(vehicleId: string, newKm: number) {
+    const docRef = doc(db, COLLECTION, vehicleId);
+    return await updateDoc(docRef, { currentKm: newKm });
+  },
   // Eliminar perfil (Baja)
   async deleteVehicle(vehicleId: string) {
     return await deleteDoc(doc(db, COLLECTION, vehicleId));

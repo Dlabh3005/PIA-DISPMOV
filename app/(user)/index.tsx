@@ -45,11 +45,11 @@ const calculateUpcomingServices = (currentKm: number): UpcomingService[] => {
   // Calcular próximo cambio de aceite (cada 6000 km)
   const nextOilChange = Math.ceil(currentKm / SERVICE_INTERVALS.oilChange) * SERVICE_INTERVALS.oilChange;
   const daysUntilOil = Math.ceil((nextOilChange - currentKm) / 100); // Aproximación: 100km/día
-  
+
   // Calcular próxima revisión general (cada 20000 km)
   const nextReview = Math.ceil(currentKm / SERVICE_INTERVALS.generalReview) * SERVICE_INTERVALS.generalReview;
   const daysUntilReview = Math.ceil((nextReview - currentKm) / 100);
-  
+
   // Calcular próximo cambio de frenos (cada 16000 km)
   const nextBrake = Math.ceil(currentKm / SERVICE_INTERVALS.brakeChange) * SERVICE_INTERVALS.brakeChange;
   const daysUntilBrake = Math.ceil((nextBrake - currentKm) / 100);
@@ -82,6 +82,10 @@ const UserHomeScreen = () => {
     plate: '',
     currentKm: ''
   });
+  // Estado para editar kilometraje
+  const [isKmModalVisible, setKmModalVisible] = useState(false);
+  const [newKm, setNewKm] = useState('');
+  const [kmLoading, setKmLoading] = useState(false);
 
   // Suscripción a Firebase para obtener el vehículo del usuario
   useEffect(() => {
@@ -119,6 +123,33 @@ const UserHomeScreen = () => {
       Alert.alert("Error", "No se pudo procesar el registro");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Actualizar kilometraje con validación
+  const handleUpdateKm = async () => {
+    const parsed = parseInt(newKm);
+    if (!newKm || isNaN(parsed)) {
+      Alert.alert('Error', 'Ingresa un número válido.');
+      return;
+    }
+    if (parsed < (myVehicle?.currentKm ?? 0)) {
+      Alert.alert(
+        'Kilometraje inválido',
+        `El nuevo kilometraje no puede ser menor al actual (${myVehicle?.currentKm?.toLocaleString()} km).`
+      );
+      return;
+    }
+    if (!myVehicle?.id) return;
+    setKmLoading(true);
+    try {
+      await VehiclesService.updateKilometrage(myVehicle.id, parsed);
+      setKmModalVisible(false);
+      setNewKm('');
+    } catch {
+      Alert.alert('Error', 'No se pudo actualizar el kilometraje. Verifica tu conexión.');
+    } finally {
+      setKmLoading(false);
     }
   };
 
@@ -181,7 +212,7 @@ const UserHomeScreen = () => {
               </Text>
               <Text className="text-blue-100">{myVehicle.model} • {myVehicle.year}</Text>
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => myVehicle.id && handleDelete(myVehicle.id)}
               className="bg-red-500/40 px-3 py-1 rounded-full"
             >
@@ -191,7 +222,19 @@ const UserHomeScreen = () => {
 
           <View className="flex-row items-center justify-between mb-3">
             <Text className="text-sm text-blue-100">Kilometraje Actual</Text>
-            <Text className="text-2xl font-bold text-white">{myVehicle.currentKm.toLocaleString()} km</Text>
+            <View className="flex-row items-center gap-2">
+              <Text className="text-2xl font-bold text-white">{myVehicle.currentKm.toLocaleString()} km</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setNewKm(String(myVehicle.currentKm));
+                  setKmModalVisible(true);
+                }}
+                className="bg-white/20 p-2 rounded-full ml-2"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={{ fontSize: 14 }}>✏️</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           <View className="bg-white/20 rounded-lg p-3">
             <Text className="text-xs text-blue-100 mb-1">Placa</Text>
@@ -199,7 +242,7 @@ const UserHomeScreen = () => {
           </View>
         </LinearGradient>
       ) : (
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => setModalVisible(true)}
           className="border-2 border-dashed border-blue-500 rounded-xl p-10 mb-6 items-center"
         >
@@ -235,6 +278,51 @@ const UserHomeScreen = () => {
         </TouchableOpacity>
       </View>
 
+      {/* --- MODAL EDICIÓN DE KILOMETRAJE --- */}
+      <Modal visible={isKmModalVisible} animationType="fade" transparent={true}>
+        <View className="flex-1 justify-center items-center bg-black/60 px-6">
+          <View className="bg-white rounded-3xl p-6 w-full shadow-2xl">
+            <Text className="text-xl font-bold text-gray-800 mb-1">Actualizar Kilometraje</Text>
+            <Text className="text-sm text-gray-400 mb-5">
+              Actual: {myVehicle?.currentKm?.toLocaleString()} km
+            </Text>
+
+            <Text className="text-gray-500 mb-2 ml-1">Nuevo kilometraje</Text>
+            <TextInput
+              className="bg-gray-100 p-4 rounded-xl text-gray-800 text-base mb-1"
+              placeholder={`Mínimo ${myVehicle?.currentKm?.toLocaleString()} km`}
+              keyboardType="numeric"
+              value={newKm}
+              onChangeText={setNewKm}
+              autoFocus
+            />
+            <Text className="text-xs text-gray-400 mb-6 ml-1">
+              El valor no puede ser menor al actual.
+            </Text>
+
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                onPress={() => { setKmModalVisible(false); setNewKm(''); }}
+                className="flex-1 border border-gray-200 py-3 rounded-xl"
+              >
+                <Text className="text-center text-gray-500 font-semibold">Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleUpdateKm}
+                disabled={kmLoading}
+                className={`flex-1 py-3 rounded-xl ${kmLoading ? 'bg-gray-400' : 'bg-blue-600'}`}
+              >
+                {kmLoading ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text className="text-white text-center font-bold">Guardar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* --- MODAL FORMULARIO DE REGISTRO --- */}
       <Modal visible={isModalVisible} animationType="slide" transparent={true}>
         <View className="flex-1 justify-end bg-black/50">
@@ -249,49 +337,49 @@ const UserHomeScreen = () => {
             <View className="space-y-4">
               <View>
                 <Text className="text-gray-500 mb-1 ml-1">Modelo (Marca y línea)</Text>
-                <TextInput 
+                <TextInput
                   className="bg-gray-100 p-4 rounded-xl"
                   placeholder="Ej: Toyota Corolla"
                   value={form.model}
-                  onChangeText={(t) => setForm({...form, model: t})}
+                  onChangeText={(t) => setForm({ ...form, model: t })}
                 />
               </View>
 
               <View className="flex-row gap-4">
                 <View className="flex-1">
                   <Text className="text-gray-500 mb-1 ml-1">Año</Text>
-                  <TextInput 
+                  <TextInput
                     className="bg-gray-100 p-4 rounded-xl"
                     placeholder="2020"
                     keyboardType="numeric"
                     value={form.year}
-                    onChangeText={(t) => setForm({...form, year: t})}
+                    onChangeText={(t) => setForm({ ...form, year: t })}
                   />
                 </View>
                 <View className="flex-1">
                   <Text className="text-gray-500 mb-1 ml-1">Placa</Text>
-                  <TextInput 
+                  <TextInput
                     className="bg-gray-100 p-4 rounded-xl"
                     placeholder="ABC-1234"
                     autoCapitalize="characters"
                     value={form.plate}
-                    onChangeText={(t) => setForm({...form, plate: t})}
+                    onChangeText={(t) => setForm({ ...form, plate: t })}
                   />
                 </View>
               </View>
 
               <View>
                 <Text className="text-gray-500 mb-1 ml-1">Kilometraje Inicial</Text>
-                <TextInput 
+                <TextInput
                   className="bg-gray-100 p-4 rounded-xl"
                   placeholder="Ej: 45000"
                   keyboardType="numeric"
                   value={form.currentKm}
-                  onChangeText={(t) => setForm({...form, currentKm: t})}
+                  onChangeText={(t) => setForm({ ...form, currentKm: t })}
                 />
               </View>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 disabled={loading}
                 onPress={handleRegister}
                 className={`mt-6 py-4 rounded-xl shadow-lg ${loading ? 'bg-gray-400' : 'bg-blue-600'}`}
