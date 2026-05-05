@@ -85,6 +85,7 @@ const AppointmentsScreen = () => {
   const [selectedService, setSelectedService] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
+  const [mileageAtService, setMileageAtService] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -118,6 +119,9 @@ const AppointmentsScreen = () => {
       date: normalized.display,
       dateISO: normalized.iso,
       time: time.trim(),
+      ...(mileageAtService.trim() !== "" && !isNaN(Number(mileageAtService))
+        ? { mileageAtService: Number(mileageAtService) }
+        : {}),
     });
 
     Alert.alert("✅ Cita enviada", "Tu cita quedó pendiente de confirmación.");
@@ -125,6 +129,7 @@ const AppointmentsScreen = () => {
     setSelectedService("");
     setDate("");
     setTime("");
+    setMileageAtService("");
   } catch (e) {
     Alert.alert("Error", "No se pudo crear la cita. Intenta de nuevo.");
   } finally {
@@ -152,6 +157,9 @@ const AppointmentsScreen = () => {
         </View>
         <Text className="text-gray-500 text-sm">📅 {item.date}</Text>
         <Text className="text-gray-500 text-sm">🕐 {item.time}</Text>
+        {item.mileageAtService !== undefined && (
+          <Text className="text-gray-500 text-sm">🛣️ {item.mileageAtService.toLocaleString()} km al servicio</Text>
+        )}
       </View>
     );
   };
@@ -232,6 +240,17 @@ const AppointmentsScreen = () => {
               value={time}
               onChangeText={setTime}
               placeholder="HH:MM AM/PM  (ej: 10:00 AM)"
+              className="border border-gray-300 rounded-xl p-3 mb-5 text-gray-800"
+              placeholderTextColor="#9ca3af"
+            />
+
+            <Text className="text-sm font-semibold text-gray-600 mb-1">🛣️ Kilometraje al momento del servicio</Text>
+            <Text className="text-xs text-gray-400 mb-2">Opcional · Solo para servicios ya realizados</Text>
+            <TextInput
+              value={mileageAtService}
+              onChangeText={setMileageAtService}
+              placeholder="Ej: 250000"
+              keyboardType="numeric"
               className="border border-gray-300 rounded-xl p-3 mb-6 text-gray-800"
               placeholderTextColor="#9ca3af"
             />

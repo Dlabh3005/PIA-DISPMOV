@@ -3,10 +3,13 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
+  limit,
   onSnapshot,
+  orderBy,
   query,
   Timestamp,
-  updateDoc, // Añadimos deleteDoc para poder eliminar
+  updateDoc,
   where,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
@@ -25,6 +28,8 @@ export interface Appointment {
   time: string;
   status: AppointmentStatus;
   createdAt: any;
+  /** Kilometraje del vehículo en el momento en que se realizó el servicio */
+  mileageAtService?: number;
 }
 
 export const AppointmentsService = {
@@ -32,11 +37,54 @@ export const AppointmentsService = {
   async createAppointment(
     data: Omit<Appointment, "id" | "status" | "createdAt">
   ) {
-    return await addDoc(collection(db, COLLECTION), {
+    const payload: Record<string, unknown> = {
       ...data,
       status: "pending",
       createdAt: Timestamp.now(),
-    });
+    };
+    // Solo persiste mileageAtService si el usuario lo proporcionó
+    if (data.mileageAtService === undefined) {
+      delete payload.mileageAtService;
+    }
+    return await addDoc(collection(db, COLLECTION), payload);
+  },
+
+  /**
+   * Devuelve el kilometraje registrado en la cita confirmada más reciente
+   * del usuario para un tipo de servicio dado, siempre que la cita sea de
+   * una fecha pasada (dateISO ≤ hoy).
+   *
+   * Regla de negocio (Opción B + C):
+   *   - Solo citas con status === "confirmed"
+   *   - Que tengan dateISO ≤ fecha actual (ya ocurrieron)
+   *   - Que tengan mileageAtService definido
+   *   - Ordenadas por dateISO DESC → se toma la más reciente
+   *
+   * Requiere índice compuesto en Firestore:
+   *   userId ASC · serviceName ASC · status ASC · dateISO DESC
+   *   (ver firestore.indexes.json en la raíz del proyecto)
+   */
+  async getLatestMileageByService(
+    userId: string,
+    serviceName: string
+  ): Promise<number | null> {
+    const todayISO = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+    const q = query(
+      collection(db, COLLECTION),
+      where("userId",      "==", userId),
+      where("serviceName", "==", serviceName),
+      where("status",      "==", "confirmed"),
+      where("dateISO",     "<=", todayISO),
+      orderBy("dateISO", "desc"),
+      limit(1)
+    );
+
+    const snap = await getDocs(q);
+    if (snap.empty) return null;
+
+    const data = snap.docs[0].data() as Appointment;
+    return typeof data.mileageAtService === "number" ? data.mileageAtService : null;
   },
 
   // Usuario: escucha sus propias citas en tiempo real

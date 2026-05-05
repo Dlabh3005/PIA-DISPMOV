@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 // Importaciones de servicios y configuración
 import { auth } from '../../src/config/firebase';
+import { AppointmentsService } from '../../src/services/AppointmentsService';
 import { VehiclesService } from '../../src/services/VehiclesService';
 
 interface VehicleData {
@@ -35,16 +36,19 @@ interface UpcomingService {
 
 // Intervalos de servicio en km
 const SERVICE_INTERVALS = {
-  oilChange: 8_000,  // Cambio de aceite: cada 8,000 km
-  generalReview: 15_000, // Revisión general: cada 15,000 km
-  brakeChange: 25_000, // Cambio de frenos: cada 25,000 km
+  oilChange: 8_000,
+  generalReview: 15_000,
+  brakeChange: 25_000,
 };
 
-/** Determina prioridad (semáforo) según porcentaje del intervalo restante.
- *  > 50% restante  → verde  (low)
- *  20–50% restante → amarillo (medium)
- *  ≤ 20% restante  → rojo   (high)
- */
+// Mapa entre el nombre en Firestore y el intervalo correspondiente
+const SERVICE_MAP: { id: string; service: string; interval: number }[] = [
+  { id: '1', service: 'Cambio de aceite',  interval: SERVICE_INTERVALS.oilChange },
+  { id: '2', service: 'Revisión general',   interval: SERVICE_INTERVALS.generalReview },
+  { id: '3', service: 'Cambio de frenos',   interval: SERVICE_INTERVALS.brakeChange },
+];
+
+/** Determina prioridad (semáforo) según porcentaje del intervalo restante. */
 const getPriority = (kmRemaining: number, interval: number): 'high' | 'medium' | 'low' => {
   const ratio = kmRemaining / interval;
   if (ratio <= 0.2) return 'high';
@@ -52,31 +56,50 @@ const getPriority = (kmRemaining: number, interval: number): 'high' | 'medium' |
   return 'low';
 };
 
-/** Calcula los próximos 3 servicios usando:
- *  km_restantes = intervalo - (km_actual % intervalo)
- *  Si no hay historial (km_actual === 0), muestra el intervalo completo.
+/**
+ * Calcula los próximos servicios de forma asíncrona.
+ * Para cada tipo de servicio:
+ *   1. Consulta la última cita confirmada + pasada con mileageAtService.
+ *   2. Si existe: kmRestantes = (mileageAtService + intervalo) - currentKm
+ *   3. Si no:     kmRestantes = intervalo - (currentKm % intervalo)  [fallback]
+ * Siempre se clampea a mínimo 0 (servicio vencido).
  */
-const calculateUpcomingServices = (currentKm: number): UpcomingService[] => {
-  const services = [
-    { id: '1', service: 'Cambio de aceite', interval: SERVICE_INTERVALS.oilChange },
-    { id: '2', service: 'Revisión general', interval: SERVICE_INTERVALS.generalReview },
-    { id: '3', service: 'Cambio de frenos', interval: SERVICE_INTERVALS.brakeChange },
-  ];
+const calculateUpcomingServicesAsync = async (
+  userId: string,
+  currentKm: number
+): Promise<UpcomingService[]> => {
+  return Promise.all(
+    SERVICE_MAP.map(async ({ id, service, interval }) => {
+      let kmRemaining: number;
 
-  return services.map(({ id, service, interval }) => {
-    const kmRemaining = currentKm === 0
-      ? interval
-      : interval - (currentKm % interval);
-    const priority = getPriority(kmRemaining, interval);
-    return { id, service, kmRemaining, interval, priority };
-  });
+      try {
+        const lastMileage = await AppointmentsService.getLatestMileageByService(userId, service);
+
+        if (lastMileage !== null) {
+          // Cálculo basado en historial real
+          kmRemaining = (lastMileage + interval) - currentKm;
+        } else {
+          // Fallback: cálculo por módulo
+          kmRemaining = currentKm === 0 ? interval : interval - (currentKm % interval);
+        }
+      } catch {
+        // Si Firestore falla (ej. índice no creado aún), usar fallback
+        kmRemaining = currentKm === 0 ? interval : interval - (currentKm % interval);
+      }
+
+      // Clampear: si ya se superó el intervalo, mostrar 0 (vencido)
+      kmRemaining = Math.max(0, kmRemaining);
+
+      return { id, service, kmRemaining, interval, priority: getPriority(kmRemaining, interval) };
+    })
+  );
 };
 
 // Servicios por defecto cuando no hay vehículo registrado
 const defaultUpcomingServices: UpcomingService[] = [
-  { id: '1', service: 'Cambio de aceite', kmRemaining: SERVICE_INTERVALS.oilChange, interval: SERVICE_INTERVALS.oilChange, priority: 'low' },
-  { id: '2', service: 'Revisión general', kmRemaining: SERVICE_INTERVALS.generalReview, interval: SERVICE_INTERVALS.generalReview, priority: 'low' },
-  { id: '3', service: 'Cambio de frenos', kmRemaining: SERVICE_INTERVALS.brakeChange, interval: SERVICE_INTERVALS.brakeChange, priority: 'low' },
+  { id: '1', service: 'Cambio de aceite', kmRemaining: SERVICE_INTERVALS.oilChange,    interval: SERVICE_INTERVALS.oilChange,    priority: 'low' },
+  { id: '2', service: 'Revisión general',  kmRemaining: SERVICE_INTERVALS.generalReview, interval: SERVICE_INTERVALS.generalReview, priority: 'low' },
+  { id: '3', service: 'Cambio de frenos',  kmRemaining: SERVICE_INTERVALS.brakeChange,  interval: SERVICE_INTERVALS.brakeChange,  priority: 'low' },
 ];
 
 const UserHomeScreen = () => {
@@ -102,12 +125,16 @@ const UserHomeScreen = () => {
   // Suscripción a Firebase para obtener el vehículo del usuario
   useEffect(() => {
     if (!user) return;
-    const unsubscribe = VehiclesService.subscribeUserVehicles(user.uid, (vehicles) => {
+    const unsubscribe = VehiclesService.subscribeUserVehicles(user.uid, async (vehicles) => {
       const vehicle = vehicles.length > 0 ? (vehicles[0] as VehicleData) : null;
       setMyVehicle(vehicle);
-      // Calcular los próximos servicios basados en el kilometraje actual
-      if (vehicle && vehicle.currentKm) {
-        setUpcomingServices(calculateUpcomingServices(vehicle.currentKm));
+
+      if (vehicle?.currentKm) {
+        // Calcular con historial real (async) y actualizar estado
+        const services = await calculateUpcomingServicesAsync(user.uid, vehicle.currentKm);
+        setUpcomingServices(services);
+      } else {
+        setUpcomingServices([]);
       }
     });
     return () => unsubscribe();

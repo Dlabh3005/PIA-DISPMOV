@@ -1,0 +1,15 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId",      "order": "ASCENDING"  },
+        { "fieldPath": "serviceName", "order": "ASCENDING"  },
+        { "fieldPath": "status",      "order": "ASCENDING"  },
+        { "fieldPath": "dateISO",     "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
