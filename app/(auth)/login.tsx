@@ -125,8 +125,20 @@ const LoginScreen = () => {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-              className="border border-gray-300 rounded-lg p-3 text-gray-800"
+              className="border border-gray-300 rounded-lg p-3 text-gray-800 mb-2"
             />
+            
+            {/* Olvidaste tu contraseña link (Solo para usuarios normales) */}
+            {!isAdmin && (
+              <TouchableOpacity 
+                className="self-end" 
+                onPress={() => router.push("/(auth)/forgot-password")}
+              >
+                <Text className="text-blue-600 font-medium text-sm">
+                  ¿Olvidaste tu contraseña?
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Botón Login */}
