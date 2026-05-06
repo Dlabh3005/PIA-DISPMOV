@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router'
 import React, { useEffect, useState } from 'react'
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { Calendar } from 'react-native-calendars'
+import { AlertsService } from '../../src/services/AlertsService'
 import { Appointment, AppointmentsService } from '../../src/services/AppointmentsService'
 import { VehiclesService } from '../../src/services/VehiclesService'
 
@@ -30,16 +31,22 @@ const AdminScreen = () => {
     return () => unsubscribe()
   }, [])
 
-  const handleApprove = async (id: string, model: string) => {
+  const handleApprove = async (id: string, model: string, userId: string) => {
     try {
       await VehiclesService.approveVehicle(id)
+      await AlertsService.createAlert(
+        userId,
+        '\u2705 Vehículo registrado',
+        `Tu vehículo ${model} ha sido aprobado. Ya puedes registrar gastos.`,
+        'success'
+      )
       Alert.alert("Éxito", `El vehículo ${model} ha sido aprobado.`)
     } catch {
       Alert.alert("Error", "No se pudo aprobar el vehículo.")
     }
   }
 
-  const handleReject = (id: string) => {
+  const handleReject = (id: string, userId: string) => {
     Alert.alert(
       "Rechazar Solicitud",
       "¿Estás seguro de que deseas eliminar esta solicitud de alta?",
@@ -48,7 +55,15 @@ const AdminScreen = () => {
         {
           text: "Eliminar",
           style: "destructive",
-          onPress: () => VehiclesService.deleteVehicle(id)
+          onPress: async () => {
+            await VehiclesService.deleteVehicle(id)
+            await AlertsService.createAlert(
+              userId,
+              '\u274c Solicitud rechazada',
+              'Tu solicitud de alta de vehículo fue rechazada.',
+              'error'
+            )
+          }
         }
       ]
     )
@@ -95,17 +110,18 @@ const AdminScreen = () => {
           pendingRequests.map((item) => (
             <View key={item.id} className="bg-gray-50 p-4 rounded-xl border mb-4">
               <Text className="font-bold">{item.model}</Text>
+              <Text className="text-gray-500 text-sm mb-1">👤 {item.userEmail}</Text>
 
               <View className="flex-row gap-2 mt-3">
                 <TouchableOpacity
-                  onPress={() => handleApprove(item.id, item.model)}
+                  onPress={() => handleApprove(item.id, item.model, item.userId)}
                   className="bg-green-600 flex-1 py-3 rounded-lg"
                 >
                   <Text className="text-white text-center font-bold">Aprobar</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  onPress={() => handleReject(item.id)}
+                  onPress={() => handleReject(item.id, item.userId)}
                   className="bg-red-100 flex-1 py-3 rounded-lg"
                 >
                   <Text className="text-red-600 text-center font-bold">Rechazar</Text>
@@ -130,14 +146,30 @@ const AdminScreen = () => {
 
             <View className="flex-row gap-2 mt-3">
               <TouchableOpacity
-                onPress={() => AppointmentsService.confirmAppointment(item.id!)}
+                onPress={async () => {
+                  await AppointmentsService.confirmAppointment(item.id!)
+                  await AlertsService.createAlert(
+                    item.userId,
+                    '\u2705 Cita confirmada',
+                    `Tu cita de ${item.serviceName} el ${item.date} ha sido confirmada`,
+                    'success'
+                  )
+                }}
                 className="bg-green-600 flex-1 py-3 rounded-lg"
               >
                 <Text className="text-white text-center font-bold">Confirmar</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => AppointmentsService.rejectAppointment(item.id!)}
+                onPress={async () => {
+                  await AppointmentsService.rejectAppointment(item.id!)
+                  await AlertsService.createAlert(
+                    item.userId,
+                    '\u274c Cita rechazada',
+                    `Tu cita de ${item.serviceName} el ${item.date} fue cancelada`,
+                    'error'
+                  )
+                }}
                 className="bg-red-100 flex-1 py-3 rounded-lg"
               >
                 <Text className="text-red-600 text-center font-bold">Rechazar</Text>

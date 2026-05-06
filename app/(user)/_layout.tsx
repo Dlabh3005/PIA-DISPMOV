@@ -1,6 +1,7 @@
 import { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs'
 import { Tabs } from 'expo-router'
 import React from 'react'
+import { InAppAlerts } from '../../components/InAppAlerts'
 
 const TabsLayout = () => {
   const screenOptions: BottomTabNavigationOptions = {
@@ -10,6 +11,7 @@ const TabsLayout = () => {
   }
 
   return (
+    <>
     <Tabs screenOptions={screenOptions}>
       <Tabs.Screen
         name="index"
@@ -57,6 +59,8 @@ const TabsLayout = () => {
         }}
       />
     </Tabs>
+    <InAppAlerts />
+    </>
   )
 }
 
